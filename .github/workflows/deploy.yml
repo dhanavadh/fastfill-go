@@ -36,20 +36,12 @@ jobs:
           WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
           WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Google Auth (Workload Identity)
-        id: auth-wif
+      - name: Google Auth
+        id: auth
         uses: 'google-github-actions/auth@v2'
-        if: ${{ secrets.WIF_PROVIDER != '' }}
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-
-      - name: Google Auth (Service Account JSON)
-        id: auth-json
-        uses: 'google-github-actions/auth@v2'
-        if: ${{ secrets.WIF_PROVIDER == '' && secrets.GCP_SA_KEY != '' }}
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Configure Docker to use gcloud as credential helper
         run: |-
