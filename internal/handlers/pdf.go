@@ -275,9 +275,10 @@ func (h *PDFHandler) convertToDataURI(url string) (string, error) {
 		} else {
 			return "", fmt.Errorf("invalid SVG URL format: %s", url)
 		}
-	} else if strings.Contains(url, "/templates/") {
-		// Legacy format: "templates/templateId/timestamp.svg"
-		parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
+	} else if strings.Contains(url, "templates/") {
+		// Legacy format: "templates/templateId/timestamp.svg" (may or may not have leading slash)
+		urlPath := strings.TrimPrefix(url, "/")
+		parts := strings.Split(urlPath, "/")
 		if len(parts) >= 3 && parts[0] == "templates" {
 			templateID = parts[1]
 			filename := parts[2]
