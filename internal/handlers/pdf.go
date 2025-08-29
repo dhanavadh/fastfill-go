@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"strings"
