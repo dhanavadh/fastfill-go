@@ -261,6 +261,11 @@ func (h *PDFHandler) convertToDataURI(url string) (string, error) {
 		return url, nil
 	}
 
+	// Convert relative URLs to full URLs
+	if !strings.HasPrefix(url, "http") {
+		url = "https://asia-southeast-apis.dooform.com/" + strings.TrimPrefix(url, "/")
+	}
+
 	// Fetch the content
 	resp, err := http.Get(url)
 	if err != nil {
