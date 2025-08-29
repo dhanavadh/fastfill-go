@@ -35,7 +35,7 @@ type GCSConfig struct {
 
 func Load() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
-		fmt.Println("No .env file found, using system environment variables")
+		fmt.Printf("Failed to load .env file: %v, using system environment variables\n", err)
 	}
 
 	config := &Config{

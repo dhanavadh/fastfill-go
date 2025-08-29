@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 	"strings"
 
 	"github.com/dhanavadh/fastfill-backend/internal"
@@ -50,20 +49,7 @@ func main() {
 	r := gin.Default()
 
 	corsConfig := cors.DefaultConfig()
-	
-	var allowOrigins []string
-	if url1 := os.Getenv("FRONTEND_URL_1"); url1 != "" {
-		allowOrigins = append(allowOrigins, url1)
-	}
-	if url2 := os.Getenv("FRONTEND_URL_2"); url2 != "" {
-		allowOrigins = append(allowOrigins, url2)
-	}
-	
-	if len(allowOrigins) == 0 {
-		corsConfig.AllowAllOrigins = true
-	} else {
-		corsConfig.AllowOrigins = allowOrigins
-	}
+	corsConfig.AllowOrigins = cfg.Server.AllowOrigins
 	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))
 
