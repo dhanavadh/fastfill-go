@@ -24,13 +24,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Debug: List all files to see what's actually copied
-RUN echo "=== All files in /app ===" && ls -la /app && \
-    echo "=== Go files ===" && find /app -name "*.go" -type f 2>/dev/null || echo "No Go files found" && \
-    echo "=== Directory structure ===" && find /app -type f 2>/dev/null | head -20
-
-# Build the application - build from the cmd/server directory
-RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
+# Build the application from the cmd/server directory
+RUN cd cmd/server && CGO_ENABLED=0 GOOS=linux go build -o ../../server .
 
 FROM alpine:latest
 
