@@ -15,7 +15,9 @@ env:
 
 jobs:
   deploy:
-    environment: production
+    environment: 
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
     permissions:
       contents: read
       id-token: write
@@ -27,16 +29,27 @@ jobs:
 
       - name: Debug secrets
         run: |
-          echo "WIF_PROVIDER exists: ${{ secrets.WIF_PROVIDER != '' }}"
-          echo "WIF_SERVICE_ACCOUNT exists: ${{ secrets.WIF_SERVICE_ACCOUNT != '' }}"
+          echo "WIF_PROVIDER length: ${#WIF_PROVIDER}"
+          echo "WIF_SERVICE_ACCOUNT length: ${#WIF_SERVICE_ACCOUNT}"
           echo "PROJECT_ID: ${{ env.PROJECT_ID }}"
+        env:
+          WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Google Auth
-        id: auth
+      - name: Google Auth (Workload Identity)
+        id: auth-wif
         uses: 'google-github-actions/auth@v2'
+        if: ${{ secrets.WIF_PROVIDER != '' }}
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Google Auth (Service Account JSON)
+        id: auth-json
+        uses: 'google-github-actions/auth@v2'
+        if: ${{ secrets.WIF_PROVIDER == '' && secrets.GCP_SA_KEY != '' }}
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Configure Docker to use gcloud as credential helper
         run: |-
