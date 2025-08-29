@@ -48,4 +48,10 @@ jobs:
           --image $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/fastfill/$SERVICE:$GITHUB_SHA \
           --platform managed \
           --region $REGION \
-          --allow-unauthenticated
+          --allow-unauthenticated \
+          --port=8080 \
+          --memory=512Mi \
+          --cpu=1 \
+          --timeout=300 \
+          --max-instances=10 \
+          --verbosity=debug
