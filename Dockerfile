@@ -24,6 +24,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Debug: List all files to see what's actually copied
+RUN echo "Files in /app:" && find /app -name "*.go" -type f
+
 # Build the application (try different common locations)
 RUN if [ -f "main.go" ]; then \
         CGO_ENABLED=0 GOOS=linux go build -o server .; \
@@ -34,7 +37,14 @@ RUN if [ -f "main.go" ]; then \
     elif [ -f "src/main.go" ]; then \
         CGO_ENABLED=0 GOOS=linux go build -o server ./src; \
     else \
-        echo "No main.go found in expected locations" && exit 1; \
+        # Try to build any Go file with main package \
+        MAIN_FILE=$(find . -name "*.go" -exec grep -l "func main()" {} \; | head -1); \
+        if [ -n "$MAIN_FILE" ]; then \
+            echo "Found main function in: $MAIN_FILE"; \
+            CGO_ENABLED=0 GOOS=linux go build -o server $(dirname "$MAIN_FILE"); \
+        else \
+            echo "No main.go or main function found in any Go files" && exit 1; \
+        fi; \
     fi
 
 FROM alpine:latest
