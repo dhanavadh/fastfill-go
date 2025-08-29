@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dhanavadh/fastfill-backend/internal/services"
@@ -109,4 +110,24 @@ func (h *UploadHandler) ServeSVG(c *gin.Context) {
 
 func (h *UploadHandler) GetSVGContent(templateID, svgID string) ([]byte, error) {
 	return h.uploadService.GetSVGContent(templateID, svgID)
+}
+
+func (h *UploadHandler) ServeLegacySVG(c *gin.Context) {
+	templateID := c.Param("templateId")
+	filename := c.Param("filename")
+	
+	// Extract SVG ID from filename (remove .svg extension)
+	svgID := strings.TrimSuffix(filename, ".svg")
+	
+	// Get SVG content
+	content, err := h.uploadService.GetSVGContent(templateID, svgID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "SVG file not found"})
+		return
+	}
+	
+	// Serve the SVG content directly
+	c.Header("Content-Type", "image/svg+xml")
+	c.Header("Cache-Control", "public, max-age=3600")
+	c.Data(http.StatusOK, "image/svg+xml", content)
 }

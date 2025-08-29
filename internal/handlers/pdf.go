@@ -19,6 +19,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 type PDFHandler struct {
 	templateService *services.TemplateService
 	formService     *services.FormService
@@ -56,7 +71,7 @@ func (h *PDFHandler) GeneratePDF(c *gin.Context) {
 		return
 	}
 
-	htmlContent, err := h.generateHTML(*template, req.Data)
+	htmlContent, err := h.generateHTML(c, *template, req.Data)
 	if err != nil {
 		log.Printf("Failed to generate HTML: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HTML"})
@@ -100,7 +115,7 @@ func (h *PDFHandler) GeneratePDFFromSubmission(c *gin.Context) {
 		return
 	}
 
-	htmlContent, err := h.generateHTML(*template, submission.FormData)
+	htmlContent, err := h.generateHTML(c, *template, submission.FormData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HTML"})
 		return
@@ -118,12 +133,17 @@ func (h *PDFHandler) GeneratePDFFromSubmission(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
-func (h *PDFHandler) generateHTML(tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
+func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
+	log.Printf("Generating HTML for template %s with SVG background: %s", tmplData.ID, tmplData.SVGBackground)
+	log.Printf("Template has %d fields", len(tmplData.Fields))
+	log.Printf("Data keys: %v", getKeys(data))
+	
 	// Convert SVG URL to data URI for embedding
 	svgDataURI, err := h.convertToDataURI(tmplData.SVGBackground)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert SVG to data URI: %w", err)
 	}
+	log.Printf("SVG data URI length: %d", len(svgDataURI))
 	htmlTemplate := `
 <!DOCTYPE html>
 <html>
@@ -190,11 +210,11 @@ func (h *PDFHandler) generateHTML(tmplData gormmodels.Template, data map[string]
 	}
 
 	templateData := struct {
-		SVGBackground string
+		SVGBackground template.URL
 		Fields        []gormmodels.Field
 		Data          map[string]interface{}
 	}{
-		SVGBackground: svgDataURI,
+		SVGBackground: template.URL(svgDataURI),
 		Fields:        tmplData.Fields,
 		Data:          data,
 	}
@@ -205,7 +225,11 @@ func (h *PDFHandler) generateHTML(tmplData gormmodels.Template, data map[string]
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	return buf.String(), nil
+	htmlContent := buf.String()
+	log.Printf("Generated HTML length: %d characters", len(htmlContent))
+	log.Printf("HTML preview (first 500 chars): %s", htmlContent[:min(500, len(htmlContent))])
+	
+	return htmlContent, nil
 }
 
 func (h *PDFHandler) htmlToPDF(htmlContent string) ([]byte, error) {
@@ -253,12 +277,15 @@ func (h *PDFHandler) htmlToPDF(htmlContent string) ([]byte, error) {
 }
 
 func (h *PDFHandler) convertToDataURI(url string) (string, error) {
+	log.Printf("Converting URL to data URI: %s", url)
 	if url == "" {
+		log.Printf("Empty URL provided")
 		return "", nil
 	}
 
 	// If it's already a data URI, return as is
 	if strings.HasPrefix(url, "data:") {
+		log.Printf("URL is already a data URI")
 		return url, nil
 	}
 
@@ -290,13 +317,80 @@ func (h *PDFHandler) convertToDataURI(url string) (string, error) {
 		return "", fmt.Errorf("unsupported SVG URL format: %s", url)
 	}
 
+	log.Printf("Parsed templateID: %s, svgID: %s", templateID, svgID)
+	
 	// Use the upload handler to get SVG content
 	content, err := h.uploadHandler.GetSVGContent(templateID, svgID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get SVG content: %w", err)
 	}
 
+	log.Printf("Retrieved SVG content length: %d bytes", len(content))
+	
 	// Convert to data URI
 	encoded := base64.StdEncoding.EncodeToString(content)
-	return fmt.Sprintf("data:image/svg+xml;base64,%s", encoded), nil
+	dataURI := fmt.Sprintf("data:image/svg+xml;base64,%s", encoded)
+	log.Printf("Generated data URI (first 100 chars): %s...", dataURI[:min(100, len(dataURI))])
+	return dataURI, nil
+}
+
+func (h *PDFHandler) convertToDirectURL(c *gin.Context, url string) string {
+	// Build absolute URL with scheme and host
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	baseURL := fmt.Sprintf("%s://%s", scheme, c.Request.Host)
+	
+	// If it's already a proper API URL, make it absolute
+	if strings.Contains(url, "/api/files/svg/") {
+		return baseURL + url
+	}
+	
+	// Convert legacy format to new SVG serving route with absolute URL
+	if strings.Contains(url, "templates/") {
+		urlPath := strings.TrimPrefix(url, "/")
+		parts := strings.Split(urlPath, "/")
+		if len(parts) >= 3 && parts[0] == "templates" {
+			templateID := parts[1]
+			filename := parts[2]
+			// Use the new SVG route that serves SVGs directly
+			return fmt.Sprintf("%s/api/svg/%s/%s", baseURL, templateID, filename)
+		}
+	}
+	
+	// Fallback to original URL
+	return url
+}
+
+func (h *PDFHandler) getSignedSVGURL(url string) (string, error) {
+	// Parse the template ID from the URL
+	var templateID string
+	
+	if strings.Contains(url, "/api/files/svg/") {
+		parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
+		if len(parts) >= 4 && parts[0] == "api" && parts[1] == "files" && parts[2] == "svg" {
+			templateID = parts[3]
+		}
+	} else if strings.Contains(url, "templates/") {
+		urlPath := strings.TrimPrefix(url, "/")
+		parts := strings.Split(urlPath, "/")
+		if len(parts) >= 3 && parts[0] == "templates" {
+			templateID = parts[1]
+		}
+	} else {
+		return url, nil // Return original if we can't parse it
+	}
+	
+	if templateID == "" {
+		return url, nil
+	}
+	
+	// Get the signed URL directly from upload service
+	signedURL, err := h.uploadHandler.uploadService.GetSVGFileURL(templateID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get signed URL: %w", err)
+	}
+	
+	return signedURL, nil
 }
