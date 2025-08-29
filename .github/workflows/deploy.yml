@@ -54,4 +54,5 @@ jobs:
           --cpu=1 \
           --timeout=300 \
           --max-instances=10 \
+          --set-env-vars="DB_HOST=${{ secrets.DB_HOST }},DB_PORT=${{ secrets.DB_PORT }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_NAME=${{ secrets.DB_NAME }},ENV=production" \
           --verbosity=debug
