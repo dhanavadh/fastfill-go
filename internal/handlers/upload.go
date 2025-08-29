@@ -106,3 +106,7 @@ func (h *UploadHandler) ServeSVG(c *gin.Context) {
 
 	c.Redirect(http.StatusTemporaryRedirect, signedURL)
 }
+
+func (h *UploadHandler) GetSVGContent(templateID, svgID string) ([]byte, error) {
+	return h.uploadService.GetSVGContent(templateID, svgID)
+}

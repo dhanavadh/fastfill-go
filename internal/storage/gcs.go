@@ -97,6 +97,24 @@ func (g *GCSClient) GetSignedURL(objectName string, expiry time.Duration) (strin
 	return url, nil
 }
 
+func (g *GCSClient) ReadFile(ctx context.Context, objectName string) ([]byte, error) {
+	bucket := g.client.Bucket(g.bucketName)
+	obj := bucket.Object(objectName)
+	
+	reader, err := obj.NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader: %w", err)
+	}
+	defer reader.Close()
+	
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read content: %w", err)
+	}
+	
+	return content, nil
+}
+
 func (g *GCSClient) Close() error {
 	return g.client.Close()
 }

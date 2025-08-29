@@ -23,12 +23,14 @@ import (
 type PDFHandler struct {
 	templateService *services.TemplateService
 	formService     *services.FormService
+	uploadHandler   *UploadHandler
 }
 
-func NewPDFHandler(templateService *services.TemplateService, formService *services.FormService) *PDFHandler {
+func NewPDFHandler(templateService *services.TemplateService, formService *services.FormService, uploadHandler *UploadHandler) *PDFHandler {
 	return &PDFHandler{
 		templateService: templateService,
 		formService:     formService,
+		uploadHandler:   uploadHandler,
 	}
 }
 
@@ -261,39 +263,24 @@ func (h *PDFHandler) convertToDataURI(url string) (string, error) {
 		return url, nil
 	}
 
-	// Convert relative URLs to full URLs
-	if !strings.HasPrefix(url, "http") {
-		url = "https://asia-southeast-apis.dooform.com/" + strings.TrimPrefix(url, "/")
+	// Extract SVG ID from the URL path
+	// URL format: "templates/templateId/timestamp.svg"
+	parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid SVG URL format: %s", url)
 	}
+	
+	templateID := parts[1]
+	filename := parts[2]
+	svgID := strings.TrimSuffix(filename, ".svg")
 
-	// Fetch the content
-	resp, err := http.Get(url)
+	// Use the upload handler to get SVG content
+	content, err := h.uploadHandler.GetSVGContent(templateID, svgID)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch SVG: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch SVG: status %d", resp.StatusCode)
-	}
-
-	// Read the content
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read SVG content: %w", err)
-	}
-
-	// Determine content type
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		if strings.Contains(string(content), "<svg") {
-			contentType = "image/svg+xml"
-		} else {
-			contentType = "application/octet-stream"
-		}
+		return "", fmt.Errorf("failed to get SVG content: %w", err)
 	}
 
 	// Convert to data URI
 	encoded := base64.StdEncoding.EncodeToString(content)
-	return fmt.Sprintf("data:%s;base64,%s", contentType, encoded), nil
+	return fmt.Sprintf("data:image/svg+xml;base64,%s", encoded), nil
 }

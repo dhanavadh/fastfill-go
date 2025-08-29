@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
+	"io"
 	"mime/multipart"
+	"net/http"
 	"time"
 
 	"github.com/dhanavadh/fastfill-backend/internal"
@@ -103,4 +105,38 @@ func (s *UploadService) DeleteSVGFile(ctx context.Context, templateID string) er
 	}
 
 	return nil
+}
+
+func (s *UploadService) GetSVGContent(templateID, svgID string) ([]byte, error) {
+	// Get signed URL and fetch content via HTTP
+	signedURL, err := s.GetSVGFileURL(templateID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch content using the signed URL
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", signedURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch SVG: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch SVG: status %d", resp.StatusCode)
+	}
+
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SVG content: %w", err)
+	}
+
+	return content, nil
 }

@@ -43,7 +43,7 @@ func main() {
 	templateHandler := handlers.NewTemplateHandler(templateService)
 	formHandler := handlers.NewFormHandler(formService, templateService)
 	uploadHandler := handlers.NewUploadHandler(uploadService, templateService)
-	pdfHandler := handlers.NewPDFHandler(templateService, formService)
+	pdfHandler := handlers.NewPDFHandler(templateService, formService, uploadHandler)
 	legacyHandler := handlers.NewLegacyHandler(templateService)
 
 	r := gin.Default()
