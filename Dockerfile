@@ -21,11 +21,13 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
-COPY . .
+# Copy source code (explicitly include cmd and internal)
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY *.go ./
 
 # Debug: List what was copied
-RUN echo "Contents of /app:" && ls -la /app && echo "Contents of /app/cmd:" && ls -la /app/cmd/ || echo "cmd directory not found"
+RUN echo "Contents of /app:" && ls -la /app && echo "Contents of /app/cmd:" && ls -la /app/cmd/
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server

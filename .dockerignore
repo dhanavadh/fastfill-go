@@ -32,5 +32,3 @@ npm-debug.log*
 # Test files
 *_test.go
 testdata/
-
-.teru
