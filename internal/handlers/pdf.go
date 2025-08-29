@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -56,12 +57,14 @@ func (h *PDFHandler) GeneratePDF(c *gin.Context) {
 
 	htmlContent, err := h.generateHTML(*template, req.Data)
 	if err != nil {
+		log.Printf("Failed to generate HTML: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HTML"})
 		return
 	}
 
 	pdfBytes, err := h.htmlToPDF(htmlContent)
 	if err != nil {
+		log.Printf("Failed to generate PDF: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate PDF"})
 		return
 	}
