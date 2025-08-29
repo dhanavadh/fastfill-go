@@ -8,10 +8,10 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GAR_LOCATION: us-central1
+  GAR_LOCATION: asia-southeast1
   REPOSITORY: fastfill
   SERVICE: fastfill-backend
-  REGION: us-central1
+  REGION: asia-southeast1
 
 jobs:
   deploy:
