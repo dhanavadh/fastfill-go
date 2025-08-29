@@ -24,8 +24,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application from the cmd/server directory
-RUN cd cmd/server && CGO_ENABLED=0 GOOS=linux go build -o ../../server .
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o server cmd/server/main.go
 
 FROM alpine:latest
 
