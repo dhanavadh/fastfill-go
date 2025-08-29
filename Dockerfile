@@ -25,7 +25,8 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o server cmd/server/main.go
+RUN ls -la cmd/server/
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o server ./cmd/server/main.go
 
 FROM alpine:latest
 
