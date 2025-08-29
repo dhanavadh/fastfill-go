@@ -24,6 +24,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Debug: List what was copied
+RUN echo "Contents of /app:" && ls -la /app && echo "Contents of /app/cmd:" && ls -la /app/cmd/ || echo "cmd directory not found"
+
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
 

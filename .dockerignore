@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Environment files
+.env*
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+server
+tmp/
+
+# Node (if any)
+node_modules/
+npm-debug.log*
+
+# Test files
+*_test.go
+testdata/
+
+.teru
