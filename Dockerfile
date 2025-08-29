@@ -24,8 +24,18 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o server .
+# Build the application (try different common locations)
+RUN if [ -f "main.go" ]; then \
+        CGO_ENABLED=0 GOOS=linux go build -o server .; \
+    elif [ -f "cmd/main.go" ]; then \
+        CGO_ENABLED=0 GOOS=linux go build -o server ./cmd; \
+    elif [ -f "cmd/server/main.go" ]; then \
+        CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server; \
+    elif [ -f "src/main.go" ]; then \
+        CGO_ENABLED=0 GOOS=linux go build -o server ./src; \
+    else \
+        echo "No main.go found in expected locations" && exit 1; \
+    fi
 
 FROM alpine:latest
 
