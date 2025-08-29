@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: ${{ vars.GOOGLE_CLOUD_PROJECT }}
   GAR_LOCATION: asia-southeast1
   REPOSITORY: fastfill
   SERVICE: fastfill-backend
@@ -48,11 +48,13 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
           env_vars: |
-            GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}
-            MYSQL_HOST=${{ secrets.MYSQL_HOST }}
-            MYSQL_USER=${{ secrets.MYSQL_USER }}
-            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-            MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+            GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }}
+            DB_HOST=${{ vars.DB_HOST }}
+            DB_USER=${{ vars.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ vars.DB_NAME }}
+            DB_PORT=${{ vars.DB_PORT }}
+            GOOGLE_CLOUD_PROJECT=${{ vars.GOOGLE_CLOUD_PROJECT }}
           flags: |
             --allow-unauthenticated
             --memory=1Gi
