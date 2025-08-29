@@ -24,9 +24,10 @@ RUN go mod download
 COPY . .
 
 # Build the Go binary
-# CGO_ENABLED=0 disables cgo for static linking, GOOS=linux ensures Linux compatibility
+# CGO_ENABLED=0 disables cgo for static linking, GOOS=linux ensures Linux compatibility  
 # -ldflags="-w -s" reduces binary size by removing debug info and symbol table
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o fastfill ./cmd/server
+RUN ls -la cmd/ && ls -la cmd/server/ && echo "Building..." && \
+    CGO_ENABLED=0 GOOS=linux go build -v -ldflags="-w -s" -o fastfill ./cmd/server
 
 # Stage 2: Create the final, minimal image
 FROM alpine:latest
