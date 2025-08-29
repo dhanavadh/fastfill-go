@@ -2,16 +2,11 @@
 .git
 .gitignore
 
-# Documentation
-*.md
-!README.md
-
 # Environment files
 .env*
 
 # Logs
 *.log
-logs/
 
 # IDE
 .vscode/
@@ -23,11 +18,6 @@ Thumbs.db
 
 # Build artifacts
 server
-tmp/
 
-# Node (if any)
-node_modules/
-npm-debug.log*
-
-# Test files
-testdata/
+# Documentation
+README.md
