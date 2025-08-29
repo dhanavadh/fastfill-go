@@ -41,5 +41,8 @@ COPY --from=builder /app/fastfill .
 # Install necessary runtime dependencies (e.g., CA certificates for HTTPS)
 RUN apk --no-cache add ca-certificates tzdata
 
+# Expose the port the app runs on
+EXPOSE 8080
+
 # Define the command to run the application
 CMD ["./fastfill"]
