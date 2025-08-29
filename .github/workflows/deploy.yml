@@ -9,6 +9,8 @@ env:
   GAR_LOCATION: asia-southeast1
   SERVICE: fastfill-backend
   REGION: asia-southeast1
+  WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+  WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
 jobs:
   deploy:
@@ -21,7 +23,8 @@ jobs:
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
       with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
+        workload_identity_provider: ${{ env.WIF_PROVIDER }}
+        service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
 
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
