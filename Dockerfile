@@ -33,13 +33,25 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o fastfill ./cmd/server
 # Stage 2: Create the final, minimal image
 FROM alpine:latest
 
+# Install Chrome and necessary runtime dependencies
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROME_PATH=/usr/bin/chromium-browser
+
 WORKDIR /root/
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/fastfill .
-
-# Install necessary runtime dependencies (e.g., CA certificates for HTTPS)
-RUN apk --no-cache add ca-certificates tzdata
 
 # Expose the port the app runs on
 EXPOSE 8080
