@@ -20,14 +20,15 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the rest of the application source code
-COPY . .
+# Copy source files
+COPY cmd cmd
+COPY internal internal
 
-# Build the Go binary
-# CGO_ENABLED=0 disables cgo for static linking, GOOS=linux ensures Linux compatibility  
-# -ldflags="-w -s" reduces binary size by removing debug info and symbol table
-RUN ls -la cmd/ && ls -la cmd/server/ && echo "Building..." && \
-    CGO_ENABLED=0 GOOS=linux go build -v -ldflags="-w -s" -o fastfill ./cmd/server
+# Debug what we have
+RUN echo "Listing /app:" && ls -la && echo "Listing cmd:" && ls -la cmd/
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o fastfill ./cmd/server
 
 # Stage 2: Create the final, minimal image
 FROM alpine:latest
