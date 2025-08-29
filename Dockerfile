@@ -1,6 +1,6 @@
-FROM golang:1.23-alpine AS builder
+# Stage 1: Build the Go application
+FROM golang:1.25-alpine AS builder
 
-# Install Chrome dependencies and Chrome
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -11,49 +11,33 @@ RUN apk add --no-cache \
     ttf-freefont \
     && rm -rf /var/cache/apk/*
 
-# Set environment variable for Chrome
 ENV CHROME_BIN=/usr/bin/chromium-browser
 ENV CHROME_PATH=/usr/bin/chromium-browser
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy go.mod and go.sum for dependency caching
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy the rest of the application source code
 COPY . .
 
-# Build the application
-RUN ls -la
-RUN find . -name "main.go" -type f
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o server ./cmd/server/main.go
+# Build the Go binary
+# CGO_ENABLED=0 disables cgo for static linking, GOOS=linux ensures Linux compatibility
+# -ldflags="-w -s" reduces binary size by removing debug info and symbol table
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o fastfill ./cmd/server
 
+# Stage 2: Create the final, minimal image
 FROM alpine:latest
 
-# Install Chrome and dependencies for runtime
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    freetype-dev \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
-    && rm -rf /var/cache/apk/*
+WORKDIR /root/
 
-# Set environment variable for Chrome
-ENV CHROME_BIN=/usr/bin/chromium-browser
-ENV CHROME_PATH=/usr/bin/chromium-browser
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/fastfill .
 
-WORKDIR /app
+# Install necessary runtime dependencies (e.g., CA certificates for HTTPS)
+RUN apk --no-cache add ca-certificates tzdata
 
-# Copy the binary from builder
-COPY --from=builder /app/server .
-
-# Create directories for config and static files
-RUN mkdir -p config static
-
-EXPOSE 8080
-
-CMD ["./server"]
+# Define the command to run the application
+CMD ["./fastfill"]
