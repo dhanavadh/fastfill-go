@@ -3,9 +3,12 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	gormmodels "github.com/dhanavadh/fastfill-backend/internal/models/gorm"
@@ -112,6 +115,11 @@ func (h *PDFHandler) GeneratePDFFromSubmission(c *gin.Context) {
 }
 
 func (h *PDFHandler) generateHTML(tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
+	// Convert SVG URL to data URI for embedding
+	svgDataURI, err := h.convertToDataURI(tmplData.SVGBackground)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert SVG to data URI: %w", err)
+	}
 	htmlTemplate := `
 <!DOCTYPE html>
 <html>
@@ -182,7 +190,7 @@ func (h *PDFHandler) generateHTML(tmplData gormmodels.Template, data map[string]
 		Fields        []gormmodels.Field
 		Data          map[string]interface{}
 	}{
-		SVGBackground: tmplData.SVGBackground,
+		SVGBackground: svgDataURI,
 		Fields:        tmplData.Fields,
 		Data:          data,
 	}
@@ -238,4 +246,46 @@ func (h *PDFHandler) htmlToPDF(htmlContent string) ([]byte, error) {
 	}
 
 	return pdfBytes, nil
+}
+
+func (h *PDFHandler) convertToDataURI(url string) (string, error) {
+	if url == "" {
+		return "", nil
+	}
+
+	// If it's already a data URI, return as is
+	if strings.HasPrefix(url, "data:") {
+		return url, nil
+	}
+
+	// Fetch the content
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch SVG: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to fetch SVG: status %d", resp.StatusCode)
+	}
+
+	// Read the content
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read SVG content: %w", err)
+	}
+
+	// Determine content type
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		if strings.Contains(string(content), "<svg") {
+			contentType = "image/svg+xml"
+		} else {
+			contentType = "application/octet-stream"
+		}
+	}
+
+	// Convert to data URI
+	encoded := base64.StdEncoding.EncodeToString(content)
+	return fmt.Sprintf("data:%s;base64,%s", contentType, encoded), nil
 }
