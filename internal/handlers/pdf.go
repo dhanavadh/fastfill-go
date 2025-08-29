@@ -263,16 +263,32 @@ func (h *PDFHandler) convertToDataURI(url string) (string, error) {
 		return url, nil
 	}
 
-	// Extract SVG ID from the URL path
-	// URL format: "templates/templateId/timestamp.svg"
-	parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid SVG URL format: %s", url)
+	var templateID string
+	var svgID string
+
+	// Handle different URL formats
+	if strings.Contains(url, "/api/files/svg/") {
+		// Current format: "/api/files/svg/{templateId}"
+		parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
+		if len(parts) >= 4 && parts[0] == "api" && parts[1] == "files" && parts[2] == "svg" {
+			templateID = parts[3]
+			svgID = "" // Will use most recent SVG for this template
+		} else {
+			return "", fmt.Errorf("invalid SVG URL format: %s", url)
+		}
+	} else if strings.Contains(url, "/templates/") {
+		// Legacy format: "templates/templateId/timestamp.svg"
+		parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
+		if len(parts) >= 3 && parts[0] == "templates" {
+			templateID = parts[1]
+			filename := parts[2]
+			svgID = strings.TrimSuffix(filename, ".svg")
+		} else {
+			return "", fmt.Errorf("invalid SVG URL format: %s", url)
+		}
+	} else {
+		return "", fmt.Errorf("unsupported SVG URL format: %s", url)
 	}
-	
-	templateID := parts[1]
-	filename := parts[2]
-	svgID := strings.TrimSuffix(filename, ".svg")
 
 	// Use the upload handler to get SVG content
 	content, err := h.uploadHandler.GetSVGContent(templateID, svgID)

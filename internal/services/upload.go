@@ -108,10 +108,32 @@ func (s *UploadService) DeleteSVGFile(ctx context.Context, templateID string) er
 }
 
 func (s *UploadService) GetSVGContent(templateID, svgID string) ([]byte, error) {
-	// Get signed URL and fetch content via HTTP
-	signedURL, err := s.GetSVGFileURL(templateID)
+	var svgFile *gormmodels.SVGFile
+	var err error
+
+	// If svgID is provided, try to find the specific SVG file
+	if svgID != "" {
+		// Look for SVG file with matching filename containing the svgID
+		err = internal.DB.Where("template_id = ? AND (filename LIKE ? OR original_name LIKE ?)", 
+			templateID, "%"+svgID+"%", "%"+svgID+"%").
+			Order("created_at DESC").First(&svgFile).Error
+	}
+
+	// If no specific SVG found or no svgID provided, get the most recent one
+	if svgFile == nil || err != nil {
+		svgFile, err = s.GetSVGFile(templateID)
+		if err != nil {
+			return nil, err
+		}
+		if svgFile == nil {
+			return nil, fmt.Errorf("SVG file not found for template %s", templateID)
+		}
+	}
+
+	// Generate signed URL for the specific file
+	signedURL, err := s.gcsClient.GetSignedURL(svgFile.GCSPath, time.Hour)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate signed URL: %w", err)
 	}
 
 	// Fetch content using the signed URL
