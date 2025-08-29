@@ -47,7 +47,7 @@ func Load() (*Config, error) {
 			DBName:   getEnv("DB_NAME", "fastfill_db"),
 		},
 		Server: ServerConfig{
-			Port:        getEnv("SERVER_PORT", "8080"),
+			Port:        getEnv("PORT", getEnv("SERVER_PORT", "8080")),
 			Environment: getEnv("ENVIRONMENT", "development"),
 			AllowOrigins: []string{
 				getEnv("FRONTEND_URL_1", "http://localhost:3000"),

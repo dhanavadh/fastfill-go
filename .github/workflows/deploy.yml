@@ -61,5 +61,5 @@ jobs:
           --timeout=300 \
           --max-instances=10 \
           --service-account=${{ secrets.CLOUD_RUN_SERVICE_ACCOUNT }} \
-          --set-env-vars="DB_HOST=${DB_HOST},DB_PORT=${DB_PORT},DB_USER=${DB_USER},DB_PASSWORD=${DB_PASSWORD},DB_NAME=${DB_NAME},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},SERVER_PORT=8080,ENVIRONMENT=production" \
+          --set-env-vars="DB_HOST=${DB_HOST},DB_PORT=${DB_PORT},DB_USER=${DB_USER},DB_PASSWORD=${DB_PASSWORD},DB_NAME=${DB_NAME},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},SERVER_PORT=8080,ENVIRONMENT=production,FRONTEND_URL_1=${{ secrets.FRONTEND_URL_1 }},FRONTEND_URL_2=${{ secrets.FRONTEND_URL_2 }}" \
           --verbosity=debug
