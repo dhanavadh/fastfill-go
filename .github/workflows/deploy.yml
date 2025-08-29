@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   GAR_LOCATION: asia-southeast1
@@ -15,6 +19,9 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     
     steps:
     - name: Checkout code
