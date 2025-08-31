@@ -56,8 +56,8 @@ jobs:
           --region $REGION \
           --allow-unauthenticated \
           --port=8080 \
-          --memory=512Mi \
-          --cpu=1 \
+          --memory=1Gi \
+          --cpu=2 \
           --timeout=300 \
           --max-instances=10 \
           --service-account=${{ secrets.CLOUD_RUN_SERVICE_ACCOUNT }} \
