@@ -174,12 +174,14 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
         
         .field {
             position: absolute;
-            font-size: 12px;
             color: black;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             word-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
             overflow: hidden;
+            padding-top: 2px;
         }
         
         .field-text {
@@ -196,6 +198,7 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
             left: {{.PositionLeft}}px;
             width: {{.PositionWidth}}px;
             height: {{.PositionHeight}}px;
+            font-size: {{if .FontSize}}{{.FontSize}}pt{{else}}12pt{{end}};
         ">
             <div class="field-text">{{index $.Data .DataKey}}</div>
         </div>
