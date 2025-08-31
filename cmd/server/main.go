@@ -62,8 +62,10 @@ func main() {
 		api.POST("/templates", templateHandler.Create)
 
 		api.POST("/upload/svg/:templateId", uploadHandler.UploadSVG)
+		api.DELETE("/upload/svg/:templateId/:svgFileId", uploadHandler.DeleteSVGFile)
 		api.GET("/templates/:id/svg", uploadHandler.GetSVG)
-		api.GET("/files/svg/:id", uploadHandler.ServeSVG)
+		api.GET("/files/svg/:templateId/page/:pageIndex", uploadHandler.ServeSVGByPage)
+		api.GET("/files/svg/:templateId", uploadHandler.ServeSVG)
 		
 		// Legacy SVG route for PDF generation
 		api.GET("/svg/:templateId/:filename", uploadHandler.ServeLegacySVG)

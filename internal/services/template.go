@@ -18,7 +18,7 @@ func NewTemplateService() *TemplateService {
 func (s *TemplateService) GetAll() ([]gormmodels.Template, error) {
 	var templates []gormmodels.Template
 
-	err := internal.DB.Preload("Fields").Order("created_at DESC").Find(&templates).Error
+	err := internal.DB.Preload("Fields").Preload("SVGFiles").Order("created_at DESC").Find(&templates).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch templates: %w", err)
 	}
@@ -29,7 +29,7 @@ func (s *TemplateService) GetAll() ([]gormmodels.Template, error) {
 func (s *TemplateService) GetByID(id string) (*gormmodels.Template, error) {
 	var template gormmodels.Template
 
-	err := internal.DB.Preload("Fields").Where("id = ?", id).First(&template).Error
+	err := internal.DB.Preload("Fields").Preload("SVGFiles").Where("id = ?", id).First(&template).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil

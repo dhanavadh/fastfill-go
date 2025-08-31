@@ -134,11 +134,17 @@ func (h *PDFHandler) GeneratePDFFromSubmission(c *gin.Context) {
 }
 
 func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
-	log.Printf("Generating HTML for template %s with SVG background: %s", tmplData.ID, tmplData.SVGBackground)
-	log.Printf("Template has %d fields", len(tmplData.Fields))
+	log.Printf("Generating HTML for template %s", tmplData.ID)
+	log.Printf("Template has %d fields and %d SVG files", len(tmplData.Fields), len(tmplData.SVGFiles))
 	log.Printf("Data keys: %v", getKeys(data))
 	
-	// Convert SVG URL to data URI for embedding
+	// Check if this is a multi-page template
+	if len(tmplData.SVGFiles) > 0 {
+		return h.generateMultiPageHTML(tmplData, data)
+	}
+	
+	// Fallback to legacy single-page generation
+	log.Printf("Using legacy single-page generation with SVG background: %s", tmplData.SVGBackground)
 	svgDataURI, err := h.convertToDataURI(tmplData.SVGBackground)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert SVG to data URI: %w", err)
@@ -235,6 +241,158 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
 	return htmlContent, nil
 }
 
+func (h *PDFHandler) generateMultiPageHTML(tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
+	log.Printf("Generating multi-page HTML for template %s", tmplData.ID)
+	
+	// Group fields by page index
+	fieldsByPage := make(map[int][]gormmodels.Field)
+	for _, field := range tmplData.Fields {
+		fieldsByPage[field.PageIndex] = append(fieldsByPage[field.PageIndex], field)
+	}
+	
+	// Group SVG files by page index
+	svgFilesByPage := make(map[int]gormmodels.SVGFile)
+	for _, svgFile := range tmplData.SVGFiles {
+		svgFilesByPage[svgFile.PageIndex] = svgFile
+	}
+	
+	var htmlPages []string
+	
+	// Generate HTML for each page that has either fields or SVG files
+	maxPage := 0
+	for pageIndex := range fieldsByPage {
+		if pageIndex > maxPage {
+			maxPage = pageIndex
+		}
+	}
+	for pageIndex := range svgFilesByPage {
+		if pageIndex > maxPage {
+			maxPage = pageIndex
+		}
+	}
+	
+	for pageIndex := 0; pageIndex <= maxPage; pageIndex++ {
+		_, hasSVG := svgFilesByPage[pageIndex]
+		fields := fieldsByPage[pageIndex]
+		
+		// Skip pages with no SVG and no fields
+		if !hasSVG && len(fields) == 0 {
+			continue
+		}
+		
+		var svgDataURI string
+		if hasSVG {
+			// Get SVG content using the page-specific identifier
+			pageIdentifier := fmt.Sprintf("page_%d", pageIndex)
+			content, err := h.uploadHandler.uploadService.GetSVGContent(tmplData.ID, pageIdentifier)
+			if err != nil {
+				log.Printf("Warning: Failed to get SVG content for page %d: %v", pageIndex, err)
+				svgDataURI = ""
+			} else {
+				// Convert to data URI
+				encoded := base64.StdEncoding.EncodeToString(content)
+				svgDataURI = fmt.Sprintf("data:image/svg+xml;base64,%s", encoded)
+				log.Printf("Generated data URI for page %d, length: %d", pageIndex, len(svgDataURI))
+			}
+		}
+		
+		// Generate HTML for this page
+		pageHTML := h.generatePageHTML(svgDataURI, fields, data)
+		htmlPages = append(htmlPages, pageHTML)
+	}
+	
+	if len(htmlPages) == 0 {
+		return "", fmt.Errorf("no pages with SVG files or fields found")
+	}
+	
+	// Combine all pages into single HTML document
+	fullHTML := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            margin: 0;
+            size: A4;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Times New Roman', serif;
+        }
+        
+        .page {
+            position: relative;
+            width: 210mm;
+            height: 297mm;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            page-break-after: always;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .field {
+            position: absolute;
+            color: black;
+            display: flex;
+            align-items: flex-start;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+            overflow: hidden;
+            padding-top: 2px;
+        }
+        
+        .field-text {
+            width: 100%%;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+%s
+</body>
+</html>`, strings.Join(htmlPages, "\n"))
+	
+	log.Printf("Generated multi-page HTML with %d pages, total length: %d characters", len(htmlPages), len(fullHTML))
+	return fullHTML, nil
+}
+
+func (h *PDFHandler) generatePageHTML(svgDataURI string, fields []gormmodels.Field, data map[string]interface{}) string {
+	var fieldsHTML strings.Builder
+	
+	for _, field := range fields {
+		value, exists := data[field.DataKey]
+		if !exists {
+			value = ""
+		}
+		
+		fieldsHTML.WriteString(fmt.Sprintf(`
+        <div class="field" style="
+            top: %dpx;
+            left: %dpx;
+            width: %dpx;
+            height: %dpx;
+            font-size: 12pt;
+        ">
+            <div class="field-text">%v</div>
+        </div>`, field.PositionTop, field.PositionLeft, field.PositionWidth, field.PositionHeight, value))
+	}
+	
+	backgroundStyle := ""
+	if svgDataURI != "" {
+		backgroundStyle = fmt.Sprintf("background-image: url('%s');", svgDataURI)
+	}
+	
+	return fmt.Sprintf(`    <div class="page" style="%s">%s
+    </div>`, backgroundStyle, fieldsHTML.String())
+}
+
 func (h *PDFHandler) htmlToPDF(htmlContent string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -297,9 +455,14 @@ func (h *PDFHandler) convertToDataURI(url string) (string, error) {
 
 	// Handle different URL formats
 	if strings.Contains(url, "/api/files/svg/") {
-		// Current format: "/api/files/svg/{templateId}"
 		parts := strings.Split(strings.TrimPrefix(url, "/"), "/")
-		if len(parts) >= 4 && parts[0] == "api" && parts[1] == "files" && parts[2] == "svg" {
+		if len(parts) >= 6 && parts[0] == "api" && parts[1] == "files" && parts[2] == "svg" && parts[4] == "page" {
+			// New format: "/api/files/svg/{templateId}/page/{pageIndex}"
+			templateID = parts[3]
+			pageIndex := parts[5]
+			svgID = fmt.Sprintf("page_%s", pageIndex) // Use page index as identifier
+		} else if len(parts) >= 4 && parts[0] == "api" && parts[1] == "files" && parts[2] == "svg" {
+			// Legacy format: "/api/files/svg/{templateId}"
 			templateID = parts[3]
 			svgID = "" // Will use most recent SVG for this template
 		} else {

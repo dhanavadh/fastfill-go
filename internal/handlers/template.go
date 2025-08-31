@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -22,14 +23,15 @@ func NewTemplateHandler(templateService *services.TemplateService) *TemplateHand
 }
 
 type TemplateResponse struct {
-	ID            string          `json:"id"`
-	DisplayName   string          `json:"displayName"`
-	Description   string          `json:"description"`
-	Category      string          `json:"category"`
-	PreviewImage  string          `json:"previewImage"`
-	SVGBackground string          `json:"svgBackground"`
-	DataInterface string          `json:"dataInterface"`
-	Fields        []FieldResponse `json:"fields"`
+	ID            string             `json:"id"`
+	DisplayName   string             `json:"displayName"`
+	Description   string             `json:"description"`
+	Category      string             `json:"category"`
+	PreviewImage  string             `json:"previewImage"`
+	SVGBackground string             `json:"svgBackground"`
+	DataInterface string             `json:"dataInterface"`
+	Fields        []FieldResponse    `json:"fields"`
+	SVGFiles      []SVGFileResponse  `json:"svgFiles,omitempty"`
 }
 
 type FieldResponse struct {
@@ -38,7 +40,16 @@ type FieldResponse struct {
 	Required           bool              `json:"required"`
 	DataKey            string            `json:"dataKey"`
 	IsAddressComponent bool              `json:"isAddressComponent"`
+	PageIndex          int               `json:"pageIndex"`
 	Position           *PositionResponse `json:"position,omitempty"`
+}
+
+type SVGFileResponse struct {
+	ID           uint   `json:"id"`
+	Filename     string `json:"filename"`
+	OriginalName string `json:"originalName"`
+	PageIndex    int    `json:"pageIndex"`
+	FileURL      string `json:"fileUrl"`
 }
 
 type PositionResponse struct {
@@ -64,6 +75,7 @@ type FieldRequest struct {
 	Required           bool             `json:"required"`
 	DataKey            string           `json:"dataKey" binding:"required"`
 	IsAddressComponent bool             `json:"isAddressComponent"`
+	PageIndex          int              `json:"pageIndex"`
 	Position           *PositionRequest `json:"position"`
 }
 
@@ -198,12 +210,28 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResp
 			Required:           f.Required,
 			DataKey:            f.DataKey,
 			IsAddressComponent: f.IsAddressComponent,
+			PageIndex:          f.PageIndex,
 			Position: &PositionResponse{
 				Top:    float64(f.PositionTop),
 				Left:   float64(f.PositionLeft),
 				Width:  float64(f.PositionWidth),
 				Height: float64(f.PositionHeight),
 			},
+		}
+	}
+
+	svgFiles := make([]SVGFileResponse, len(t.SVGFiles))
+	for i, svf := range t.SVGFiles {
+		scheme := "http"
+		host := "localhost:8080" // Default fallback
+		fileURL := fmt.Sprintf("%s://%s/api/files/svg/%s/page/%d", scheme, host, t.ID, svf.PageIndex)
+		
+		svgFiles[i] = SVGFileResponse{
+			ID:           svf.ID,
+			Filename:     svf.Filename,
+			OriginalName: svf.OriginalName,
+			PageIndex:    svf.PageIndex,
+			FileURL:      fileURL,
 		}
 	}
 
@@ -216,6 +244,7 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResp
 		SVGBackground: t.SVGBackground,
 		DataInterface: t.DataInterface,
 		Fields:        fields,
+		SVGFiles:      svgFiles,
 	}
 }
 
@@ -228,6 +257,7 @@ func (h *TemplateHandler) toGormFields(fields []FieldRequest) []gormmodels.Field
 			Required:           f.Required,
 			DataKey:            f.DataKey,
 			IsAddressComponent: f.IsAddressComponent,
+			PageIndex:          f.PageIndex,
 		}
 
 		if f.Position != nil {

@@ -29,6 +29,7 @@ type Field struct {
 	DataKey            string    `gorm:"not null" json:"dataKey"`
 	IsAddressComponent bool      `json:"isAddressComponent"`
 	FontSize           int       `gorm:"default:12" json:"fontSize"`
+	PageIndex          int       `gorm:"default:0" json:"pageIndex"`
 	PositionTop        int       `json:"positionTop"`
 	PositionLeft       int       `json:"positionLeft"`
 	PositionWidth      int       `json:"positionWidth"`
@@ -71,6 +72,7 @@ type SVGFile struct {
 	FileSize     int64     `json:"fileSize"`
 	MimeType     string    `json:"mimeType"`
 	GCSPath      string    `json:"gcsPath,omitempty"`
+	PageIndex    int       `gorm:"default:0" json:"pageIndex"`
 	CreatedAt    time.Time `json:"createdAt"`
 
 	Template Template `gorm:"foreignKey:TemplateID" json:"-"`
