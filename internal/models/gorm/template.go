@@ -30,6 +30,7 @@ type Field struct {
 	IsAddressComponent bool      `json:"isAddressComponent"`
 	FontSize           int       `gorm:"default:12" json:"fontSize"`
 	PageIndex          int       `gorm:"default:0" json:"pageIndex"`
+	Options            string    `gorm:"type:longtext" json:"options,omitempty"`
 	PositionTop        int       `json:"positionTop"`
 	PositionLeft       int       `json:"positionLeft"`
 	PositionWidth      int       `json:"positionWidth"`

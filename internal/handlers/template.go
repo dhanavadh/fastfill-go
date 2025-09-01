@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	gormmodels "github.com/dhanavadh/fastfill-backend/internal/models/gorm"
@@ -41,6 +43,7 @@ type FieldResponse struct {
 	DataKey            string            `json:"dataKey"`
 	IsAddressComponent bool              `json:"isAddressComponent"`
 	PageIndex          int               `json:"pageIndex"`
+	Options            []string          `json:"options,omitempty"`
 	Position           *PositionResponse `json:"position,omitempty"`
 }
 
@@ -76,6 +79,7 @@ type FieldRequest struct {
 	DataKey            string           `json:"dataKey" binding:"required"`
 	IsAddressComponent bool             `json:"isAddressComponent"`
 	PageIndex          int              `json:"pageIndex"`
+	Options            []string         `json:"options,omitempty"`
 	Position           *PositionRequest `json:"position"`
 }
 
@@ -182,7 +186,8 @@ func (h *TemplateHandler) Update(c *gin.Context) {
 		}
 	} else {
 		if err := h.templateService.Update(template); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update template"})
+			fmt.Printf("Template update error: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update template", "details": err.Error()})
 			return
 		}
 	}
@@ -204,6 +209,14 @@ func (h *TemplateHandler) Delete(c *gin.Context) {
 func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResponse {
 	fields := make([]FieldResponse, len(t.Fields))
 	for i, f := range t.Fields {
+		var options []string
+		if f.Options != "" {
+			if err := json.Unmarshal([]byte(f.Options), &options); err != nil {
+				// If unmarshal fails, treat as empty options
+				options = nil
+			}
+		}
+		
 		fields[i] = FieldResponse{
 			Name:               f.Name,
 			Type:               f.Type,
@@ -211,6 +224,7 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResp
 			DataKey:            f.DataKey,
 			IsAddressComponent: f.IsAddressComponent,
 			PageIndex:          f.PageIndex,
+			Options:            options,
 			Position: &PositionResponse{
 				Top:    float64(f.PositionTop),
 				Left:   float64(f.PositionLeft),
@@ -251,6 +265,22 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResp
 func (h *TemplateHandler) toGormFields(fields []FieldRequest) []gormmodels.Field {
 	gormFields := make([]gormmodels.Field, len(fields))
 	for i, f := range fields {
+		var optionsJSON string
+		if len(f.Options) > 0 {
+			// Filter out empty options
+			validOptions := make([]string, 0)
+			for _, opt := range f.Options {
+				if strings.TrimSpace(opt) != "" {
+					validOptions = append(validOptions, strings.TrimSpace(opt))
+				}
+			}
+			if len(validOptions) > 0 {
+				if optionsBytes, err := json.Marshal(validOptions); err == nil {
+					optionsJSON = string(optionsBytes)
+				}
+			}
+		}
+		
 		gormFields[i] = gormmodels.Field{
 			Name:               f.Name,
 			Type:               f.Type,
@@ -258,6 +288,7 @@ func (h *TemplateHandler) toGormFields(fields []FieldRequest) []gormmodels.Field
 			DataKey:            f.DataKey,
 			IsAddressComponent: f.IsAddressComponent,
 			PageIndex:          f.PageIndex,
+			Options:            optionsJSON,
 		}
 
 		if f.Position != nil {
