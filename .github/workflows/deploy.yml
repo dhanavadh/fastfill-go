@@ -56,10 +56,12 @@ jobs:
           --region $REGION \
           --allow-unauthenticated \
           --port=8080 \
-          --memory=1Gi \
-          --cpu=2 \
+          --memory=2Gi \
+          --cpu=4 \
           --timeout=300 \
-          --max-instances=10 \
+          --max-instances=15 \
+          --min-instances=2 \
+          --concurrency=80 \
           --service-account=${{ secrets.CLOUD_RUN_SERVICE_ACCOUNT }} \
           --set-env-vars="DB_HOST=${DB_HOST},DB_PORT=${DB_PORT},DB_USER=${DB_USER},DB_PASSWORD=${DB_PASSWORD},DB_NAME=${DB_NAME},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},SERVER_PORT=8080,ENVIRONMENT=production,FRONTEND_URL_1=https://www.dooform.com,FRONTEND_URL_2=https://www.dooform.com" \
           --verbosity=debug
