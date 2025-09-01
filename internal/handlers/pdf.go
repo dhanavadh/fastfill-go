@@ -49,16 +49,22 @@ func NewPDFHandler(templateService *services.TemplateService, formService *servi
 }
 
 type GeneratePDFRequest struct {
-	TemplateID string                 `json:"templateId" binding:"required"`
-	Data       map[string]interface{} `json:"data" binding:"required"`
+	TemplateID      string                 `json:"templateId" binding:"required"`
+	Data            map[string]interface{} `json:"data" binding:"required"`
+	FormattingData  map[string]interface{} `json:"formattingData,omitempty"`
+	HtmlData        map[string]interface{} `json:"htmlData,omitempty"`
 }
 
 func (h *PDFHandler) GeneratePDF(c *gin.Context) {
 	var req GeneratePDFRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Failed to bind JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
+	
+	log.Printf("PDF generation request received: templateId=%s, data keys=%v, htmlData keys=%v", 
+		req.TemplateID, getKeys(req.Data), getKeys(req.HtmlData))
 
 	template, err := h.templateService.GetByID(req.TemplateID)
 	if err != nil {
@@ -71,12 +77,18 @@ func (h *PDFHandler) GeneratePDF(c *gin.Context) {
 		return
 	}
 
-	htmlContent, err := h.generateHTML(c, *template, req.Data)
+	log.Printf("About to generate HTML with data: %+v", req.Data)
+	log.Printf("About to generate HTML with htmlData: %+v", req.HtmlData)
+	
+	htmlContent, err := h.generateHTML(c, *template, req.Data, req.FormattingData, req.HtmlData)
 	if err != nil {
 		log.Printf("Failed to generate HTML: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HTML"})
 		return
 	}
+	
+	log.Printf("Generated HTML content length: %d", len(htmlContent))
+	log.Printf("HTML content preview: %s", htmlContent[:min(1000, len(htmlContent))])
 
 	pdfBytes, err := h.htmlToPDF(htmlContent)
 	if err != nil {
@@ -115,7 +127,7 @@ func (h *PDFHandler) GeneratePDFFromSubmission(c *gin.Context) {
 		return
 	}
 
-	htmlContent, err := h.generateHTML(c, *template, submission.FormData)
+	htmlContent, err := h.generateHTML(c, *template, submission.FormData, submission.FormattingData, submission.HtmlData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HTML"})
 		return
@@ -133,14 +145,14 @@ func (h *PDFHandler) GeneratePDFFromSubmission(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
-func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
+func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, data map[string]interface{}, formattingData map[string]interface{}, htmlData map[string]interface{}) (string, error) {
 	log.Printf("Generating HTML for template %s", tmplData.ID)
 	log.Printf("Template has %d fields and %d SVG files", len(tmplData.Fields), len(tmplData.SVGFiles))
 	log.Printf("Data keys: %v", getKeys(data))
 	
 	// Check if this is a multi-page template
 	if len(tmplData.SVGFiles) > 0 {
-		return h.generateMultiPageHTML(tmplData, data)
+		return h.generateMultiPageHTML(tmplData, data, formattingData, htmlData)
 	}
 	
 	// Fallback to legacy single-page generation
@@ -170,8 +182,8 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
         
         .document-container {
             position: relative;
-            width: 210mm;
-            height: 297mm;
+            width: 794px;
+            height: 1123px;
             background-image: url('{{.SVGBackground}}');
             background-size: cover;
             background-repeat: no-repeat;
@@ -205,8 +217,13 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
             width: {{.PositionWidth}}px;
             height: {{.PositionHeight}}px;
             font-size: {{if .FontSize}}{{.FontSize}}pt{{else}}12pt{{end}};
+            font-weight: {{if .FontWeight}}{{.FontWeight}}{{else}}normal{{end}};
+            font-style: {{if .FontStyle}}{{.FontStyle}}{{else}}normal{{end}};
+            text-decoration: {{if .TextDecoration}}{{.TextDecoration}}{{else}}none{{end}};
+            color: {{if .TextColor}}{{.TextColor}}{{else}}#000000{{end}};
+            font-family: {{if .FontFamily}}'{{.FontFamily}}', serif{{else}}'Times New Roman', serif{{end}};
         ">
-            <div class="field-text">{{index $.Data .DataKey}}</div>
+            <div class="field-text">{{if index $.HtmlData .DataKey}}{{index $.HtmlData .DataKey}}{{else}}{{index $.Data .DataKey}}{{end}}</div>
         </div>
         {{end}}
     </div>
@@ -218,14 +235,54 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
+	// Apply formatting overrides to fields
+	fieldsWithFormatting := make([]gormmodels.Field, len(tmplData.Fields))
+	copy(fieldsWithFormatting, tmplData.Fields)
+	
+	if formattingData != nil {
+		for i, field := range fieldsWithFormatting {
+			if fieldFormatting, exists := formattingData[field.DataKey]; exists {
+				if formatting, ok := fieldFormatting.(map[string]interface{}); ok {
+					if fontWeight, ok := formatting["fontWeight"].(string); ok && fontWeight != "" {
+						fieldsWithFormatting[i].FontWeight = fontWeight
+					}
+					if fontStyle, ok := formatting["fontStyle"].(string); ok && fontStyle != "" {
+						fieldsWithFormatting[i].FontStyle = fontStyle
+					}
+					if textDecoration, ok := formatting["textDecoration"].(string); ok && textDecoration != "" {
+						fieldsWithFormatting[i].TextDecoration = textDecoration
+					}
+					if textColor, ok := formatting["textColor"].(string); ok && textColor != "" {
+						fieldsWithFormatting[i].TextColor = textColor
+					}
+					if fontFamily, ok := formatting["fontFamily"].(string); ok && fontFamily != "" {
+						fieldsWithFormatting[i].FontFamily = fontFamily
+					}
+				}
+			}
+		}
+	}
+
+	// Convert HTML data to template.HTML type to prevent escaping
+	processedHtmlData := make(map[string]template.HTML)
+	if htmlData != nil {
+		for key, value := range htmlData {
+			if str, ok := value.(string); ok {
+				processedHtmlData[key] = template.HTML(str)
+			}
+		}
+	}
+
 	templateData := struct {
 		SVGBackground template.URL
 		Fields        []gormmodels.Field
 		Data          map[string]interface{}
+		HtmlData      map[string]template.HTML
 	}{
 		SVGBackground: template.URL(svgDataURI),
-		Fields:        tmplData.Fields,
+		Fields:        fieldsWithFormatting,
 		Data:          data,
+		HtmlData:      processedHtmlData,
 	}
 
 	var buf bytes.Buffer
@@ -241,7 +298,7 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
 	return htmlContent, nil
 }
 
-func (h *PDFHandler) generateMultiPageHTML(tmplData gormmodels.Template, data map[string]interface{}) (string, error) {
+func (h *PDFHandler) generateMultiPageHTML(tmplData gormmodels.Template, data map[string]interface{}, formattingData map[string]interface{}, htmlData map[string]interface{}) (string, error) {
 	log.Printf("Generating multi-page HTML for template %s", tmplData.ID)
 	
 	// Group fields by page index
@@ -296,8 +353,50 @@ func (h *PDFHandler) generateMultiPageHTML(tmplData gormmodels.Template, data ma
 			}
 		}
 		
+		// Apply formatting overrides to fields for this page
+		fieldsWithFormatting := make([]gormmodels.Field, len(fields))
+		copy(fieldsWithFormatting, fields)
+		
+		if formattingData != nil {
+			for i, field := range fieldsWithFormatting {
+				if fieldFormatting, exists := formattingData[field.DataKey]; exists {
+					if formatting, ok := fieldFormatting.(map[string]interface{}); ok {
+						if fontWeight, ok := formatting["fontWeight"].(string); ok && fontWeight != "" {
+							fieldsWithFormatting[i].FontWeight = fontWeight
+						}
+						if fontStyle, ok := formatting["fontStyle"].(string); ok && fontStyle != "" {
+							fieldsWithFormatting[i].FontStyle = fontStyle
+						}
+						if textDecoration, ok := formatting["textDecoration"].(string); ok && textDecoration != "" {
+							fieldsWithFormatting[i].TextDecoration = textDecoration
+						}
+						if textColor, ok := formatting["textColor"].(string); ok && textColor != "" {
+							fieldsWithFormatting[i].TextColor = textColor
+						}
+						if fontFamily, ok := formatting["fontFamily"].(string); ok && fontFamily != "" {
+							fieldsWithFormatting[i].FontFamily = fontFamily
+						}
+					}
+				}
+			}
+		}
+		
+		// Merge HTML data into regular data for this page
+		mergedData := make(map[string]interface{})
+		for k, v := range data {
+			mergedData[k] = v
+		}
+		// Prioritize HTML data over plain text data
+		if htmlData != nil {
+			for k, v := range htmlData {
+				if v != "" {
+					mergedData[k] = v
+				}
+			}
+		}
+		
 		// Generate HTML for this page
-		pageHTML := h.generatePageHTML(svgDataURI, fields, data)
+		pageHTML := h.generatePageHTML(svgDataURI, fieldsWithFormatting, mergedData)
 		htmlPages = append(htmlPages, pageHTML)
 	}
 	
@@ -324,8 +423,8 @@ func (h *PDFHandler) generateMultiPageHTML(tmplData gormmodels.Template, data ma
         
         .page {
             position: relative;
-            width: 210mm;
-            height: 297mm;
+            width: 794px;
+            height: 1123px;
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center;
@@ -389,7 +488,8 @@ func (h *PDFHandler) generatePageHTML(svgDataURI string, fields []gormmodels.Fie
 		backgroundStyle = fmt.Sprintf("background-image: url('%s');", svgDataURI)
 	}
 	
-	return fmt.Sprintf(`    <div class="page" style="%s">%s
+	return fmt.Sprintf(`    <div class="page" style="%s">
+%s
     </div>`, backgroundStyle, fieldsHTML.String())
 }
 

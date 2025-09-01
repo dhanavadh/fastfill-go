@@ -35,6 +35,11 @@ type Field struct {
 	PositionLeft       int       `json:"positionLeft"`
 	PositionWidth      int       `json:"positionWidth"`
 	PositionHeight     int       `json:"positionHeight"`
+	FontWeight         string    `gorm:"default:normal" json:"fontWeight,omitempty"`
+	FontStyle          string    `gorm:"default:normal" json:"fontStyle,omitempty"`
+	TextDecoration     string    `gorm:"default:none" json:"textDecoration,omitempty"`
+	TextColor          string    `gorm:"default:#000000" json:"textColor,omitempty"`
+	FontFamily         string    `gorm:"default:Times New Roman" json:"fontFamily,omitempty"`
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
 
@@ -80,12 +85,14 @@ type SVGFile struct {
 }
 
 type FormSubmission struct {
-	ID         string                 `gorm:"primaryKey" json:"id"`
-	TemplateID string                 `gorm:"not null;index" json:"templateId"`
-	FormData   map[string]interface{} `gorm:"serializer:json" json:"formData"`
-	Status     string                 `gorm:"default:draft" json:"status"`
-	CreatedAt  time.Time             `json:"createdAt"`
-	UpdatedAt  time.Time             `json:"updatedAt"`
+	ID             string                 `gorm:"primaryKey" json:"id"`
+	TemplateID     string                 `gorm:"not null;index" json:"templateId"`
+	FormData       map[string]interface{} `gorm:"serializer:json" json:"formData"`
+	FormattingData map[string]interface{} `gorm:"serializer:json" json:"formattingData,omitempty"`
+	HtmlData       map[string]interface{} `gorm:"serializer:json" json:"htmlData,omitempty"`
+	Status         string                 `gorm:"default:draft" json:"status"`
+	CreatedAt      time.Time             `json:"createdAt"`
+	UpdatedAt      time.Time             `json:"updatedAt"`
 
 	Template Template `gorm:"foreignKey:TemplateID" json:"-"`
 }

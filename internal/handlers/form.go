@@ -23,9 +23,11 @@ func NewFormHandler(formService *services.FormService, templateService *services
 }
 
 type SubmitFormRequest struct {
-	TemplateID string                 `json:"templateId" binding:"required"`
-	FormData   map[string]interface{} `json:"formData" binding:"required"`
-	Status     string                 `json:"status"`
+	TemplateID      string                 `json:"templateId" binding:"required"`
+	FormData        map[string]interface{} `json:"formData" binding:"required"`
+	FormattingData  map[string]interface{} `json:"formattingData,omitempty"`
+	HtmlData        map[string]interface{} `json:"htmlData,omitempty"`
+	Status          string                 `json:"status"`
 }
 
 type UpdateFormRequest struct {
@@ -45,10 +47,12 @@ func (h *FormHandler) Submit(c *gin.Context) {
 	}
 
 	submission := &gormmodels.FormSubmission{
-		ID:         uuid.New().String(),
-		TemplateID: req.TemplateID,
-		FormData:   req.FormData,
-		Status:     req.Status,
+		ID:             uuid.New().String(),
+		TemplateID:     req.TemplateID,
+		FormData:       req.FormData,
+		FormattingData: req.FormattingData,
+		HtmlData:       req.HtmlData,
+		Status:         req.Status,
 	}
 
 	if err := h.formService.Create(submission); err != nil {
