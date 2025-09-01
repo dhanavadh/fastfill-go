@@ -34,6 +34,36 @@ func min(a, b int) int {
 	return b
 }
 
+func getString(m map[string]interface{}, key string, defaultValue string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return defaultValue
+}
+
+func getInt(m map[string]interface{}, key string, defaultValue int) int {
+	if val, ok := m[key]; ok {
+		if f, ok := val.(float64); ok {
+			return int(f)
+		}
+		if i, ok := val.(int); ok {
+			return i
+		}
+	}
+	return defaultValue
+}
+
+func getBool(m map[string]interface{}, key string, defaultValue bool) bool {
+	if val, ok := m[key]; ok {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+	}
+	return defaultValue
+}
+
 type PDFHandler struct {
 	templateService *services.TemplateService
 	formService     *services.FormService
@@ -53,6 +83,7 @@ type GeneratePDFRequest struct {
 	Data            map[string]interface{} `json:"data" binding:"required"`
 	FormattingData  map[string]interface{} `json:"formattingData,omitempty"`
 	HtmlData        map[string]interface{} `json:"htmlData,omitempty"`
+	CustomFields    []interface{}          `json:"customFields,omitempty"`
 }
 
 func (h *PDFHandler) GeneratePDF(c *gin.Context) {
@@ -63,8 +94,8 @@ func (h *PDFHandler) GeneratePDF(c *gin.Context) {
 		return
 	}
 	
-	log.Printf("PDF generation request received: templateId=%s, data keys=%v, htmlData keys=%v", 
-		req.TemplateID, getKeys(req.Data), getKeys(req.HtmlData))
+	log.Printf("PDF generation request received: templateId=%s, data keys=%v, htmlData keys=%v, formattingData keys=%v", 
+		req.TemplateID, getKeys(req.Data), getKeys(req.HtmlData), getKeys(req.FormattingData))
 
 	template, err := h.templateService.GetByID(req.TemplateID)
 	if err != nil {
@@ -79,8 +110,65 @@ func (h *PDFHandler) GeneratePDF(c *gin.Context) {
 
 	log.Printf("About to generate HTML with data: %+v", req.Data)
 	log.Printf("About to generate HTML with htmlData: %+v", req.HtmlData)
+	log.Printf("Custom fields received: %+v", req.CustomFields)
 	
-	htmlContent, err := h.generateHTML(c, *template, req.Data, req.FormattingData, req.HtmlData)
+	// Add custom fields to template
+	extendedTemplate := *template
+	if req.CustomFields != nil && len(req.CustomFields) > 0 {
+		for _, customFieldData := range req.CustomFields {
+			if fieldMap, ok := customFieldData.(map[string]interface{}); ok {
+				customField := gormmodels.Field{
+					Name:           getString(fieldMap, "name", "Custom Field"),
+					Type:           getString(fieldMap, "type", "text"),
+					Required:       getBool(fieldMap, "required", false),
+					DataKey:        getString(fieldMap, "dataKey", ""),
+					FontSize:       getInt(fieldMap, "fontSize", 12),
+					PageIndex:      getInt(fieldMap, "pageIndex", 0),
+					PositionTop:    getInt(fieldMap, "position.top", 0),
+					PositionLeft:   getInt(fieldMap, "position.left", 0),
+					PositionWidth:  getInt(fieldMap, "position.width", 150),
+					PositionHeight: getInt(fieldMap, "position.height", 25),
+				}
+				
+				// Handle formatting from fieldMap or from global formattingData
+				if formatting, ok := fieldMap["formatting"].(map[string]interface{}); ok {
+					customField.FontWeight = getString(formatting, "fontWeight", "normal")
+					customField.FontStyle = getString(formatting, "fontStyle", "normal")
+					customField.TextDecoration = getString(formatting, "textDecoration", "none")
+					customField.TextColor = getString(formatting, "textColor", "#000000")
+					customField.FontFamily = getString(formatting, "fontFamily", "Times New Roman")
+				} else if req.FormattingData != nil {
+					log.Printf("Checking formatting data for custom field %s, available keys: %v", customField.DataKey, getKeys(req.FormattingData))
+					// Check if formatting exists in global formattingData for this custom field
+					if fieldFormatting, exists := req.FormattingData[customField.DataKey]; exists {
+						log.Printf("Found formatting for custom field %s: %+v", customField.DataKey, fieldFormatting)
+						if formatting, ok := fieldFormatting.(map[string]interface{}); ok {
+							customField.FontWeight = getString(formatting, "fontWeight", "normal")
+							customField.FontStyle = getString(formatting, "fontStyle", "normal")
+							customField.TextDecoration = getString(formatting, "textDecoration", "none")
+							customField.TextColor = getString(formatting, "textColor", "#000000")
+							customField.FontFamily = getString(formatting, "fontFamily", "Times New Roman")
+							log.Printf("Applied formatting to custom field %s: FontWeight=%s, FontStyle=%s, TextColor=%s", 
+								customField.DataKey, customField.FontWeight, customField.FontStyle, customField.TextColor)
+						}
+					} else {
+						log.Printf("No formatting found for custom field %s in formattingData", customField.DataKey)
+					}
+				}
+				// Handle nested position object
+				if pos, ok := fieldMap["position"].(map[string]interface{}); ok {
+					customField.PositionTop = getInt(pos, "top", 0)
+					customField.PositionLeft = getInt(pos, "left", 0)
+					customField.PositionWidth = getInt(pos, "width", 150)
+					customField.PositionHeight = getInt(pos, "height", 25)
+				}
+				extendedTemplate.Fields = append(extendedTemplate.Fields, customField)
+				log.Printf("Added custom field: %+v", customField)
+			}
+		}
+	}
+	
+	htmlContent, err := h.generateHTML(c, extendedTemplate, req.Data, req.FormattingData, req.HtmlData)
 	if err != nil {
 		log.Printf("Failed to generate HTML: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate HTML"})
@@ -239,6 +327,11 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
 	fieldsWithFormatting := make([]gormmodels.Field, len(tmplData.Fields))
 	copy(fieldsWithFormatting, tmplData.Fields)
 	
+	log.Printf("Template has %d fields before formatting", len(fieldsWithFormatting))
+	for i, field := range fieldsWithFormatting {
+		log.Printf("Field %d: DataKey=%s, Position=(%d,%d,%d,%d)", i, field.DataKey, field.PositionTop, field.PositionLeft, field.PositionWidth, field.PositionHeight)
+	}
+	
 	if formattingData != nil {
 		for i, field := range fieldsWithFormatting {
 			if fieldFormatting, exists := formattingData[field.DataKey]; exists {
@@ -284,6 +377,11 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
 		Data:          data,
 		HtmlData:      processedHtmlData,
 	}
+	
+	log.Printf("Template data prepared with %d fields and %d data entries", len(templateData.Fields), len(templateData.Data))
+	for dataKey, value := range templateData.Data {
+		log.Printf("Data entry: %s = %v", dataKey, value)
+	}
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, templateData)
@@ -294,6 +392,18 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
 	htmlContent := buf.String()
 	log.Printf("Generated HTML length: %d characters", len(htmlContent))
 	log.Printf("HTML preview (first 500 chars): %s", htmlContent[:min(500, len(htmlContent))])
+	
+	// Debug: show the field section of the HTML
+	fieldSectionStart := strings.Index(htmlContent, "<div class=\"field\"")
+	if fieldSectionStart > 0 {
+		fieldSectionEnd := fieldSectionStart + 1000
+		if fieldSectionEnd > len(htmlContent) {
+			fieldSectionEnd = len(htmlContent)
+		}
+		log.Printf("Field section preview: %s", htmlContent[fieldSectionStart:fieldSectionEnd])
+	} else {
+		log.Printf("Warning: No field divs found in generated HTML")
+	}
 	
 	return htmlContent, nil
 }
