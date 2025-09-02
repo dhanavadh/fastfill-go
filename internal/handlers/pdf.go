@@ -280,7 +280,6 @@ func (h *PDFHandler) generateHTML(c *gin.Context, tmplData gormmodels.Template, 
         
         .field {
             position: absolute;
-            color: black;
             display: flex;
             align-items: flex-start;
             word-wrap: break-word;
@@ -547,7 +546,6 @@ func (h *PDFHandler) generateMultiPageHTML(tmplData gormmodels.Template, data ma
         
         .field {
             position: absolute;
-            color: black;
             display: flex;
             align-items: flex-start;
             word-wrap: break-word;
