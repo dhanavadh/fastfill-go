@@ -25,6 +25,7 @@ type ServerConfig struct {
 	Port         string
 	Environment  string
 	AllowOrigins []string
+	BaseURL      string
 }
 
 type GCSConfig struct {
@@ -49,6 +50,7 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			Port:        getEnv("PORT", getEnv("SERVER_PORT", "8080")),
 			Environment: getEnv("ENVIRONMENT", "development"),
+			BaseURL:     getEnv("API_BASE_URL", ""),
 			AllowOrigins: []string{
 				getEnv("FRONTEND_URL_1", "http://localhost:3000"),
 				getEnv("FRONTEND_URL_2", "http://localhost:3001"),

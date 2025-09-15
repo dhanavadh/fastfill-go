@@ -40,9 +40,9 @@ func main() {
 	formService := services.NewFormService()
 	uploadService := services.NewUploadService(gcsClient)
 
-	templateHandler := handlers.NewTemplateHandler(templateService)
+	templateHandler := handlers.NewTemplateHandler(templateService, cfg)
 	formHandler := handlers.NewFormHandler(formService, templateService)
-	uploadHandler := handlers.NewUploadHandler(uploadService, templateService)
+	uploadHandler := handlers.NewUploadHandler(uploadService, templateService, cfg)
 	pdfHandler := handlers.NewPDFHandler(templateService, formService, uploadHandler)
 	legacyHandler := handlers.NewLegacyHandler(templateService)
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dhanavadh/fastfill-backend/internal/services"
+	"github.com/dhanavadh/fastfill-backend/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,13 +17,34 @@ import (
 type UploadHandler struct {
 	uploadService   *services.UploadService
 	templateService *services.TemplateService
+	config          *config.Config
 }
 
-func NewUploadHandler(uploadService *services.UploadService, templateService *services.TemplateService) *UploadHandler {
+func NewUploadHandler(uploadService *services.UploadService, templateService *services.TemplateService, cfg *config.Config) *UploadHandler {
 	return &UploadHandler{
 		uploadService:   uploadService,
 		templateService: templateService,
+		config:          cfg,
 	}
+}
+
+func (h *UploadHandler) getBaseURL(c *gin.Context) string {
+	// Priority: 1. API_BASE_URL config, 2. Request host, 3. localhost fallback
+	if h.config.Server.BaseURL != "" {
+		return h.config.Server.BaseURL
+	}
+	
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	
+	host := c.Request.Host
+	if host == "" {
+		host = "localhost:8080" // Final fallback
+	}
+	
+	return fmt.Sprintf("%s://%s", scheme, host)
 }
 
 func (h *UploadHandler) UploadSVG(c *gin.Context) {
@@ -59,11 +81,8 @@ func (h *UploadHandler) UploadSVG(c *gin.Context) {
 	}
 
 	// Generate URL for frontend to use  
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
-	}
-	fileURL := fmt.Sprintf("%s://%s/api/files/svg/%s", scheme, c.Request.Host, templateID)
+	baseURL := h.getBaseURL(c)
+	fileURL := fmt.Sprintf("%s/api/files/svg/%s", baseURL, templateID)
 
 	// Only update legacy SVG background for page 0 to maintain backward compatibility
 	if pageIndex == 0 {

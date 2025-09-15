@@ -9,6 +9,7 @@ import (
 
 	gormmodels "github.com/dhanavadh/fastfill-backend/internal/models/gorm"
 	"github.com/dhanavadh/fastfill-backend/internal/services"
+	"github.com/dhanavadh/fastfill-backend/internal/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -16,11 +17,13 @@ import (
 
 type TemplateHandler struct {
 	templateService *services.TemplateService
+	config          *config.Config
 }
 
-func NewTemplateHandler(templateService *services.TemplateService) *TemplateHandler {
+func NewTemplateHandler(templateService *services.TemplateService, cfg *config.Config) *TemplateHandler {
 	return &TemplateHandler{
 		templateService: templateService,
+		config:          cfg,
 	}
 }
 
@@ -99,7 +102,7 @@ func (h *TemplateHandler) GetAll(c *gin.Context) {
 
 	response := make([]TemplateResponse, len(templates))
 	for i, t := range templates {
-		response[i] = h.toTemplateResponse(t)
+		response[i] = h.toTemplateResponse(t, c)
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -119,7 +122,7 @@ func (h *TemplateHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, h.toTemplateResponse(*template))
+	c.JSON(http.StatusOK, h.toTemplateResponse(*template, c))
 }
 
 func (h *TemplateHandler) Create(c *gin.Context) {
@@ -149,7 +152,7 @@ func (h *TemplateHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, h.toTemplateResponse(*template))
+	c.JSON(http.StatusCreated, h.toTemplateResponse(*template, c))
 }
 
 func (h *TemplateHandler) Update(c *gin.Context) {
@@ -192,7 +195,7 @@ func (h *TemplateHandler) Update(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, h.toTemplateResponse(*template))
+	c.JSON(http.StatusOK, h.toTemplateResponse(*template, c))
 }
 
 func (h *TemplateHandler) Delete(c *gin.Context) {
@@ -206,7 +209,26 @@ func (h *TemplateHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Template deleted successfully"})
 }
 
-func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResponse {
+func (h *TemplateHandler) getBaseURL(c *gin.Context) string {
+	// Priority: 1. API_BASE_URL config, 2. Request host, 3. localhost fallback
+	if h.config.Server.BaseURL != "" {
+		return h.config.Server.BaseURL
+	}
+	
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	
+	host := c.Request.Host
+	if host == "" {
+		host = "localhost:8080" // Final fallback
+	}
+	
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template, c *gin.Context) TemplateResponse {
 	fields := make([]FieldResponse, len(t.Fields))
 	for i, f := range t.Fields {
 		var options []string
@@ -235,10 +257,9 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template) TemplateResp
 	}
 
 	svgFiles := make([]SVGFileResponse, len(t.SVGFiles))
+	baseURL := h.getBaseURL(c)
 	for i, svf := range t.SVGFiles {
-		scheme := "http"
-		host := "localhost:8080" // Default fallback
-		fileURL := fmt.Sprintf("%s://%s/api/files/svg/%s/page/%d", scheme, host, t.ID, svf.PageIndex)
+		fileURL := fmt.Sprintf("%s/api/files/svg/%s/page/%d", baseURL, t.ID, svf.PageIndex)
 		
 		svgFiles[i] = SVGFileResponse{
 			ID:           svf.ID,
