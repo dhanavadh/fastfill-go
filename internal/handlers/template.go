@@ -270,13 +270,26 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template, c *gin.Conte
 		}
 	}
 
+	// Generate SVGBackground URL dynamically
+	svgBackground := ""
+	if t.SVGBackground != "" {
+		// If it's already a full URL (http/https), use as is
+		if strings.HasPrefix(t.SVGBackground, "http://") || strings.HasPrefix(t.SVGBackground, "https://") {
+			svgBackground = t.SVGBackground
+		} else {
+			// If it's a relative path or just template ID, construct the URL
+			baseURL := h.getBaseURL(c)
+			svgBackground = fmt.Sprintf("%s/api/files/svg/%s", baseURL, t.ID)
+		}
+	}
+
 	return TemplateResponse{
 		ID:            t.ID,
 		DisplayName:   t.DisplayName,
 		Description:   t.Description,
 		Category:      t.Category,
 		PreviewImage:  t.PreviewImage,
-		SVGBackground: t.SVGBackground,
+		SVGBackground: svgBackground,
 		DataInterface: t.DataInterface,
 		Fields:        fields,
 		SVGFiles:      svgFiles,

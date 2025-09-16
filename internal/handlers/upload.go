@@ -93,7 +93,8 @@ func (h *UploadHandler) UploadSVG(c *gin.Context) {
 		}
 
 		if template != nil {
-			template.SVGBackground = fileURL
+			// Store just the template ID instead of full URL for flexibility
+			template.SVGBackground = templateID
 			if err := h.templateService.Update(template); err != nil {
 				fmt.Printf("Warning: Failed to update template SVG background: %v\n", err)
 			}
