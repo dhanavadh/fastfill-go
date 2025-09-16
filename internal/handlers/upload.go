@@ -35,7 +35,16 @@ func (h *UploadHandler) getBaseURL(c *gin.Context) string {
 	}
 	
 	scheme := "http"
+	
+	// Check for HTTPS in multiple ways (for load balancers/proxies)
 	if c.Request.TLS != nil {
+		scheme = "https"
+	} else if c.Request.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	} else if c.Request.Header.Get("X-Forwarded-Ssl") == "on" {
+		scheme = "https"
+	} else if h.config.Server.Environment == "production" {
+		// Force HTTPS in production
 		scheme = "https"
 	}
 	
