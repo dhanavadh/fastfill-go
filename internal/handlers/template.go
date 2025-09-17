@@ -231,7 +231,8 @@ func (h *TemplateHandler) getBaseURL(c *gin.Context) string {
 	
 	host := c.Request.Host
 	if host == "" {
-		host = "localhost:8080" // Final fallback
+		// Use production domain as fallback instead of localhost
+		host = "api.dooform.com"
 	}
 	
 	return fmt.Sprintf("%s://%s", scheme, host)

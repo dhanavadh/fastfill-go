@@ -13,8 +13,9 @@ import (
 func CleanupTemplateURLs(db *gorm.DB) error {
 	var templates []gormmodels.Template
 	
-	// Find all templates with URLs in SVGBackground field
-	if err := db.Where("svg_background LIKE ? OR svg_background LIKE ?", "http://localhost%", "https://asia-southeast-apis.dooform.com%").Find(&templates).Error; err != nil {
+	// Find all templates with URLs in SVGBackground field (including various localhost and old domain patterns)
+	if err := db.Where("svg_background LIKE ? OR svg_background LIKE ? OR svg_background LIKE ?", 
+		"http://localhost%", "https://localhost%", "https://asia-southeast-apis.dooform.com%").Find(&templates).Error; err != nil {
 		return fmt.Errorf("failed to fetch templates: %w", err)
 	}
 
@@ -64,7 +65,8 @@ func CleanupTemplateURLs(db *gorm.DB) error {
 func CleanupTemplateURLsDryRun(db *gorm.DB) error {
 	var templates []gormmodels.Template
 	
-	if err := db.Where("svg_background LIKE ? OR svg_background LIKE ?", "http://localhost%", "https://asia-southeast-apis.dooform.com%").Find(&templates).Error; err != nil {
+	if err := db.Where("svg_background LIKE ? OR svg_background LIKE ? OR svg_background LIKE ?", 
+		"http://localhost%", "https://localhost%", "https://asia-southeast-apis.dooform.com%").Find(&templates).Error; err != nil {
 		return fmt.Errorf("failed to fetch templates: %w", err)
 	}
 
