@@ -1,22 +1,33 @@
-name: Deploy to Google Cloud Run
+name: Deploy On-Premises
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: 'Deployment type'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
 
 permissions:
   contents: read
   id-token: write
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GAR_LOCATION: asia-southeast1
   SERVICE: fastfill-backend
-  REGION: asia-southeast1
+  MAX_CPU_CORES: 8
+  MAX_MEMORY_GB: 16
+  MAX_RUNTIME_HOURS: 15
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
@@ -25,24 +36,33 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
-
-    - name: Configure Docker to use gcloud as credential helper
+    - name: Check system resources
       run: |
-        gcloud auth configure-docker $GAR_LOCATION-docker.pkg.dev
-
-    - name: Build and Push Docker image
+        echo "Available CPU cores: $(nproc)"
+        echo "Available memory: $(free -h)"
+        echo "Disk space: $(df -h)"
+        
+    - name: Set resource limits
       run: |
-        docker build -t $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/fastfill/$SERVICE:$GITHUB_SHA .
-        docker push $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/fastfill/$SERVICE:$GITHUB_SHA
+        echo "Setting CPU limit to $MAX_CPU_CORES cores"
+        echo "Setting memory limit to ${MAX_MEMORY_GB}GB"
+        echo "Maximum runtime: $MAX_RUNTIME_HOURS hours"
 
-    - name: Deploy to Cloud Run
+    - name: Build Docker image with resource limits
+      run: |
+        docker build \
+          --cpus=$MAX_CPU_CORES \
+          --memory=${MAX_MEMORY_GB}g \
+          -t $SERVICE:$GITHUB_SHA .
+      timeout-minutes: 30
+
+    - name: Stop existing container if running
+      run: |
+        docker stop $SERVICE || true
+        docker rm $SERVICE || true
+      continue-on-error: true
+
+    - name: Deploy container with resource limits
       env:
         DB_HOST: ${{ secrets.DB_HOST }}
         DB_PORT: ${{ secrets.DB_PORT }}
@@ -51,18 +71,45 @@ jobs:
         DB_NAME: ${{ secrets.DB_NAME }}
         API_BASE_URL: ${{ secrets.API_BASE_URL }}
       run: |
-        gcloud run deploy $SERVICE \
-          --image $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/fastfill/$SERVICE:$GITHUB_SHA \
-          --platform managed \
-          --region $REGION \
-          --allow-unauthenticated \
-          --port=8080 \
-          --memory=2Gi \
-          --cpu=4 \
-          --timeout=300 \
-          --max-instances=15 \
-          --min-instances=2 \
-          --concurrency=80 \
-          --service-account=${{ secrets.CLOUD_RUN_SERVICE_ACCOUNT }} \
-          --set-env-vars="DB_HOST=${DB_HOST},DB_PORT=${DB_PORT},DB_USER=${DB_USER},DB_PASSWORD=${DB_PASSWORD},DB_NAME=${DB_NAME},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GOOGLE_CLOUD_PROJECT=${PROJECT_ID},SERVER_PORT=8080,ENVIRONMENT=production,FRONTEND_URL_1=https://www.app.dooform.com,FRONTEND_URL_2=https://www.dooform.com,API_BASE_URL=${API_BASE_URL}" \
-          --verbosity=debug
+        docker run -d \
+          --name $SERVICE \
+          --cpus=$MAX_CPU_CORES \
+          --memory=${MAX_MEMORY_GB}g \
+          --restart=unless-stopped \
+          -p 8080:8080 \
+          -e DB_HOST=$DB_HOST \
+          -e DB_PORT=$DB_PORT \
+          -e DB_USER=$DB_USER \
+          -e DB_PASSWORD=$DB_PASSWORD \
+          -e DB_NAME=$DB_NAME \
+          -e SERVER_PORT=8080 \
+          -e ENVIRONMENT=production \
+          -e FRONTEND_URL_1=https://www.app.dooform.com \
+          -e FRONTEND_URL_2=https://www.dooform.com \
+          -e API_BASE_URL=$API_BASE_URL \
+          $SERVICE:$GITHUB_SHA
+      timeout-minutes: 10
+
+    - name: Schedule auto-shutdown
+      run: |
+        # Create a shutdown script that will stop the container after MAX_RUNTIME_HOURS
+        echo "#!/bin/bash" > /tmp/auto_shutdown.sh
+        echo "sleep $((MAX_RUNTIME_HOURS * 3600))" >> /tmp/auto_shutdown.sh
+        echo "docker stop $SERVICE" >> /tmp/auto_shutdown.sh
+        echo "echo 'Container $SERVICE stopped after $MAX_RUNTIME_HOURS hours'" >> /tmp/auto_shutdown.sh
+        chmod +x /tmp/auto_shutdown.sh
+        nohup /tmp/auto_shutdown.sh > /tmp/shutdown.log 2>&1 &
+        echo "Auto-shutdown scheduled for $MAX_RUNTIME_HOURS hours"
+
+    - name: Health check
+      run: |
+        echo "Waiting for service to be ready..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8080/health 2>/dev/null; then
+            echo "Service is healthy"
+            break
+          fi
+          echo "Attempt $i: Service not ready yet, waiting..."
+          sleep 10
+        done
+      timeout-minutes: 5
