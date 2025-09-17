@@ -39,12 +39,14 @@ func main() {
 	templateService := services.NewTemplateService()
 	formService := services.NewFormService()
 	uploadService := services.NewUploadService(gcsClient)
+	ocrService := services.NewOCRService(cfg)
 
 	templateHandler := handlers.NewTemplateHandler(templateService, cfg)
 	formHandler := handlers.NewFormHandler(formService, templateService)
 	uploadHandler := handlers.NewUploadHandler(uploadService, templateService, cfg)
 	pdfHandler := handlers.NewPDFHandler(templateService, formService, uploadHandler)
 	legacyHandler := handlers.NewLegacyHandler(templateService)
+	ocrHandler := handlers.NewOCRHandler(ocrService)
 
 	r := gin.Default()
 
@@ -81,6 +83,9 @@ func main() {
 
 		api.GET("/form-templates", legacyHandler.GetFormTemplates)
 		api.POST("/templates/from-form-svg", legacyHandler.CreateTemplateFromFormSVG)
+
+		// OCR endpoints
+		api.POST("/ocr/thai-id", ocrHandler.ProcessImage)
 
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})

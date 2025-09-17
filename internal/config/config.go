@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	GCS      GCSConfig
+	Database     DatabaseConfig
+	Server       ServerConfig
+	GCS          GCSConfig
+	GoogleVision GoogleVisionConfig
 }
 
 type DatabaseConfig struct {
@@ -32,6 +33,10 @@ type GCSConfig struct {
 	BucketName      string
 	ProjectID       string
 	CredentialsPath string
+}
+
+type GoogleVisionConfig struct {
+	APIKey string
 }
 
 func Load() (*Config, error) {
@@ -60,6 +65,9 @@ func Load() (*Config, error) {
 			BucketName:      getEnv("GCS_BUCKET_NAME", ""),
 			ProjectID:       getEnv("GOOGLE_CLOUD_PROJECT", ""),
 			CredentialsPath: getEnv("GCS_CREDENTIALS_PATH", ""),
+		},
+		GoogleVision: GoogleVisionConfig{
+			APIKey: getEnv("GOOGLE_VISION_API_KEY", ""),
 		},
 	}
 
