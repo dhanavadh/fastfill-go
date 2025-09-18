@@ -49,6 +49,21 @@ jobs:
         DB_NAME: ${{ secrets.DB_NAME }}
         API_BASE_URL: ${{ secrets.API_BASE_URL }}
       run: |
+        cat > env-vars.yaml << EOF
+        DB_HOST: ${DB_HOST}
+        DB_PORT: ${DB_PORT}
+        DB_USER: ${DB_USER}
+        DB_PASSWORD: ${DB_PASSWORD}
+        DB_NAME: ${DB_NAME}
+        GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+        GOOGLE_CLOUD_PROJECT: ${PROJECT_ID}
+        SERVER_PORT: 8080
+        ENVIRONMENT: production
+        FRONTEND_URL_1: https://www.app.dooform.com
+        FRONTEND_URL_2: https://www.dooform.com
+        API_BASE_URL: ${API_BASE_URL}
+        EOF
+        
         gcloud run deploy $SERVICE \
           --image $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/fastfill/$SERVICE:$GITHUB_SHA \
           --platform managed \
@@ -63,5 +78,5 @@ jobs:
           --concurrency=80 \
           --service-account=${{ secrets.CLOUD_RUN_SERVICE_ACCOUNT }} \
           --add-cloudsql-instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
-          --update-env-vars=DB_HOST="${DB_HOST}",DB_PORT="${DB_PORT}",DB_USER="${DB_USER}",DB_PASSWORD="${DB_PASSWORD}",DB_NAME="${DB_NAME}",GCS_BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}",GOOGLE_CLOUD_PROJECT="${PROJECT_ID}",SERVER_PORT=8080,ENVIRONMENT=production,FRONTEND_URL_1="https://www.app.dooform.com",FRONTEND_URL_2="https://www.dooform.com",API_BASE_URL="${API_BASE_URL}" \
+          --env-vars-file=env-vars.yaml \
           --verbosity=debug
