@@ -75,7 +75,7 @@ func getEnv(key, defaultValue string) string {
 
 func (d *DatabaseConfig) DSN() string {
 	// Check if we're using Cloud SQL Unix socket (path starts with /)
-	if d.Host[0] == '/' {
+	if len(d.Host) > 0 && d.Host[0] == '/' {
 		return fmt.Sprintf("%s:%s@unix(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 			d.User, d.Password, d.Host, d.DBName)
 	}

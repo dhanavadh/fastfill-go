@@ -15,7 +15,9 @@ var DB *gormdb.DB
 
 func InitDB(cfg *config.Config) error {
 	var err error
-	DB, err = gormdb.Open(mysql.Open(cfg.Database.DSN()), &gormdb.Config{})
+	dsn := cfg.Database.DSN()
+	log.Printf("Connecting to database with DSN: %s", dsn)
+	DB, err = gormdb.Open(mysql.Open(dsn), &gormdb.Config{})
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
