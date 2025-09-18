@@ -12,7 +12,6 @@ type Template struct {
 	PreviewImage  string    `json:"previewImage"`
 	SVGBackground string    `json:"svgBackground"`
 	DataInterface string    `json:"dataInterface"`
-	OCREnabled    bool      `gorm:"default:false" json:"ocrEnabled"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 

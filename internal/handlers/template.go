@@ -35,7 +35,6 @@ type TemplateResponse struct {
 	PreviewImage  string             `json:"previewImage"`
 	SVGBackground string             `json:"svgBackground"`
 	DataInterface string             `json:"dataInterface"`
-	OCREnabled    bool               `json:"ocrEnabled"`
 	Fields        []FieldResponse    `json:"fields"`
 	SVGFiles      []SVGFileResponse  `json:"svgFiles,omitempty"`
 }
@@ -73,7 +72,6 @@ type CreateTemplateRequest struct {
 	PreviewImage  string         `json:"previewImage"`
 	SVGBackground string         `json:"svgBackground"`
 	DataInterface string         `json:"dataInterface"`
-	OCREnabled    bool           `json:"ocrEnabled"`
 	Fields        []FieldRequest `json:"fields"`
 }
 
@@ -142,7 +140,6 @@ func (h *TemplateHandler) Create(c *gin.Context) {
 		PreviewImage:  req.PreviewImage,
 		SVGBackground: req.SVGBackground,
 		DataInterface: req.DataInterface,
-		OCREnabled:    req.OCREnabled,
 		Fields:        h.toGormFields(req.Fields),
 	}
 
@@ -175,7 +172,6 @@ func (h *TemplateHandler) Update(c *gin.Context) {
 		PreviewImage:  req.PreviewImage,
 		SVGBackground: req.SVGBackground,
 		DataInterface: req.DataInterface,
-		OCREnabled:    req.OCREnabled,
 		Fields:        h.toGormFields(req.Fields),
 		UpdatedAt:     time.Now(),
 	}
@@ -305,7 +301,6 @@ func (h *TemplateHandler) toTemplateResponse(t gormmodels.Template, c *gin.Conte
 		PreviewImage:  t.PreviewImage,
 		SVGBackground: svgBackground,
 		DataInterface: t.DataInterface,
-		OCREnabled:    t.OCREnabled,
 		Fields:        fields,
 		SVGFiles:      svgFiles,
 	}
