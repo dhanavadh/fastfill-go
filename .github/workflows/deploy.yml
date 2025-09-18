@@ -50,18 +50,18 @@ jobs:
         API_BASE_URL: ${{ secrets.API_BASE_URL }}
       run: |
         cat > env-vars.yaml << EOF
-        DB_HOST: ${DB_HOST}
-        DB_PORT: ${DB_PORT}
-        DB_USER: ${DB_USER}
-        DB_PASSWORD: ${DB_PASSWORD}
-        DB_NAME: ${DB_NAME}
-        GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
-        GOOGLE_CLOUD_PROJECT: ${PROJECT_ID}
-        SERVER_PORT: 8080
-        ENVIRONMENT: production
-        FRONTEND_URL_1: https://www.app.dooform.com
-        FRONTEND_URL_2: https://www.dooform.com
-        API_BASE_URL: ${API_BASE_URL}
+        DB_HOST: "${DB_HOST}"
+        DB_PORT: "${DB_PORT}"
+        DB_USER: "${DB_USER}"
+        DB_PASSWORD: "${DB_PASSWORD}"
+        DB_NAME: "${DB_NAME}"
+        GCS_BUCKET_NAME: "${{ secrets.GCS_BUCKET_NAME }}"
+        GOOGLE_CLOUD_PROJECT: "${PROJECT_ID}"
+        SERVER_PORT: "8080"
+        ENVIRONMENT: "production"
+        FRONTEND_URL_1: "https://www.app.dooform.com"
+        FRONTEND_URL_2: "https://www.dooform.com"
+        API_BASE_URL: "${API_BASE_URL}"
         EOF
         
         gcloud run deploy $SERVICE \
